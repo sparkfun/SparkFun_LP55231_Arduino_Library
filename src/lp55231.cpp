@@ -95,44 +95,51 @@ static const uint8_t REG_ENG3_MAP_LSB = 0x75;
 
 static const uint8_t REG_GAIN_CHANGE = 0x76;
 
-lp55231::lp55231(uint8_t address)
+/********************************************************************************/
+//  Lp55231: The Simple base class.
+//
+// allows direct control over the LED outputs, and basic chip featurers like output current setting,
+/********************************************************************************/
+
+
+
+Lp55231::Lp55231(uint8_t address)
 {
   _address = address;
 }
 
-void lp55231::init()
+void Lp55231::Begin()
 {
   Wire.begin();
 
-  // TBD: so we want more operations in here, or should they be called
-  // explicitly?
+  Reset();
 }
 
-void lp55231::enable()
+void Lp55231::Enable()
 {
-  // and re-enable
-  writeReg(REG_CNTRL1, 0x40 );
+  // Set enable bit
+  WriteReg(REG_CNTRL1, 0x40 );
 
-  // enable internal clock & charge pump & auto increment
-  writeReg(REG_MISC, 0x53);
+  // enable internal clock & charge pump & write auto increment
+  WriteReg(REG_MISC, 0x53);
 }
 
-void lp55231::disable()
+void Lp55231::Disable()
 {
   uint8_t val;
 
-  val = readReg(REG_CNTRL1);
+  val = ReadReg(REG_CNTRL1);
   val &= ~0x40;
-  writeReg(REG_CNTRL1, val);
+  WriteReg(REG_CNTRL1, val);
 }
 
-void lp55231::reset()
+void Lp55231::Reset()
 {
   // force reset
-  writeReg(REG_RESET, 0xff);
+  WriteReg(REG_RESET, 0xff);
 }
 
-bool lp55231::setBrightness(uint8_t channel, uint8_t value)
+bool Lp55231::SetChannelPWM(uint8_t channel, uint8_t value)
 {
   // Serial.print("setBrt: chan: ");
   // Serial.print(channel);
@@ -145,11 +152,56 @@ bool lp55231::setBrightness(uint8_t channel, uint8_t value)
     return false;
   }
 
-  writeReg(REG_D1_PWM + channel, value);
+  WriteReg(REG_D1_PWM + channel, value);
   return true;
 }
 
-bool lp55231::setLogBrightness(uint8_t channel)
+/********************************************************************************/
+/**  private member functions. **/
+/********************************************************************************/
+
+uint8_t Lp55231::ReadReg(uint8_t reg)
+{
+  // Wire is awkward because it doesn't really have a register address concept.
+  // http://www.arduino.cc/en/Tutorial/SFRRangerReader for reference
+
+  Wire.beginTransmission(_address);
+  Wire.write(reg);
+  Wire.endTransmission(false);// false keeps connection active so we can read.
+
+  delayMicroseconds(10);
+
+  uint8_t status = Wire.requestFrom(_address, (uint8_t)1);
+  if(status)
+  {
+    return(Wire.read());
+  }
+  else
+  {
+    Serial.print("readReg failed? status:");
+    Serial.println(status, HEX);
+  }
+  return 0xff;
+}
+
+void Lp55231::WriteReg(uint8_t reg, uint8_t val)
+{
+  Wire.beginTransmission(_address);
+  Wire.write(reg);
+  Wire.write(val);
+  Wire.endTransmission();
+}
+
+
+/********************************************************************************/
+/**  old code below. **/
+/********************************************************************************/
+
+#if 0
+
+
+
+bool lp55231dep::setLogBrightness(uint8_t channel)
 {
   if(channel >= 9)
   {
@@ -161,7 +213,7 @@ bool lp55231::setLogBrightness(uint8_t channel)
   return true;
 }
 
-bool lp55231::setDriveCurrent(uint8_t channel, uint8_t value)
+bool lp55231dep::setDriveCurrent(uint8_t channel, uint8_t value)
 {
   if(channel > 9)
   {
@@ -174,7 +226,7 @@ bool lp55231::setDriveCurrent(uint8_t channel, uint8_t value)
   return true;
 }
 
-int8_t lp55231::readDegC()
+int8_t lp55231dep::readDegC()
 {
   uint8_t status;
   int8_t  temperature;
@@ -192,7 +244,7 @@ int8_t lp55231::readDegC()
   return temperature;
 }
 
-float  lp55231::readLEDADC(uint8_t channel)
+float  lp55231dep::readLEDADC(uint8_t channel)
 {
   uint8_t reading;
   float volts;
@@ -213,7 +265,7 @@ float  lp55231::readLEDADC(uint8_t channel)
   return volts;
 }
 
-float  lp55231::readVoutADC()
+float  lp55231dep::readVoutADC()
 {
   uint8_t reading;
   float volts;
@@ -224,7 +276,7 @@ float  lp55231::readVoutADC()
   return volts;
 }
 
-float  lp55231::readVddADC()
+float  lp55231dep::readVddADC()
 {
   uint8_t reading;
   float volts;
@@ -235,7 +287,7 @@ float  lp55231::readVddADC()
   return volts;
 }
 
-float  lp55231::readIntADC()
+float  lp55231dep::readIntADC()
 {
   uint8_t reading;
   float volts;
@@ -246,7 +298,7 @@ float  lp55231::readIntADC()
   return volts;
 }
 
-void lp55231::overrideIntToGPO(bool overrideOn )
+void lp55231dep::overrideIntToGPO(bool overrideOn )
 {
   uint8_t regVal;
 
@@ -262,7 +314,7 @@ void lp55231::overrideIntToGPO(bool overrideOn )
   writeReg(REG_INT_GPIO, regVal);
 }
 
-bool lp55231::setIntGPOVal(bool value)
+bool lp55231dep::setIntGPOVal(bool value)
 {
   uint8_t regVal;
 
@@ -288,7 +340,7 @@ bool lp55231::setIntGPOVal(bool value)
 
 
 
-bool lp55231::setMasterFader(uint8_t engine, uint8_t value)
+bool lp55231dep::setMasterFader(uint8_t engine, uint8_t value)
 {
   if((engine == 0) || (engine > 3))
   {
@@ -300,7 +352,7 @@ bool lp55231::setMasterFader(uint8_t engine, uint8_t value)
   return true;
 }
 
-void lp55231::showControls()
+void lp55231dep::showControls()
 {
  Serial.print("Control regs: ");
  Serial.print(readReg(REG_CNTRL1) & 0xff, HEX);
@@ -308,7 +360,7 @@ void lp55231::showControls()
  Serial.println(readReg(REG_CNTRL2) & 0xff, HEX);
 }
 
-bool lp55231::loadProgram(const uint16_t* prog, uint8_t len)
+bool lp55231dep::loadProgram(const uint16_t* prog, uint8_t len)
 {
   uint8_t val;
   uint8_t page;
@@ -375,7 +427,7 @@ bool lp55231::loadProgram(const uint16_t* prog, uint8_t len)
   return true;
 }
 
-bool lp55231::verifyProgram(const uint16_t* prog, uint8_t len)
+bool lp55231dep::verifyProgram(const uint16_t* prog, uint8_t len)
 {
   uint8_t val, page;
 
@@ -457,7 +509,7 @@ bool lp55231::verifyProgram(const uint16_t* prog, uint8_t len)
   return true;
 }
 
-bool lp55231::setEngineEntryPoint(uint8_t engine, uint8_t addr)
+bool lp55231dep::setEngineEntryPoint(uint8_t engine, uint8_t addr)
 {
 
   if(engine > 2)
@@ -471,7 +523,7 @@ bool lp55231::setEngineEntryPoint(uint8_t engine, uint8_t addr)
   return true;
 }
 
-bool lp55231::setEnginePC(uint8_t engine, uint8_t addr)
+bool lp55231dep::setEnginePC(uint8_t engine, uint8_t addr)
 {
   uint8_t control_val, control2_val, temp;;
 
@@ -509,7 +561,7 @@ bool lp55231::setEnginePC(uint8_t engine, uint8_t addr)
   return true;
 }
 
-uint8_t lp55231::getEnginePC(uint8_t engine)
+uint8_t lp55231dep::getEnginePC(uint8_t engine)
 {
   // must set Hold to touch PC...
   uint8_t control_val, pc_val;
@@ -525,7 +577,7 @@ uint8_t lp55231::getEnginePC(uint8_t engine)
   return(pc_val);
 }
 
-uint8_t lp55231::getEngineMap(uint8_t engine)
+uint8_t lp55231dep::getEngineMap(uint8_t engine)
 {
   if(engine > 2)
   {
@@ -536,7 +588,7 @@ uint8_t lp55231::getEngineMap(uint8_t engine)
   return(readReg(REG_ENG1_MAP_LSB + engine));
 }
 
-bool lp55231::setEngineModeHold(uint8_t engine)
+bool lp55231dep::setEngineModeHold(uint8_t engine)
 {
   uint8_t val;
 
@@ -556,7 +608,7 @@ bool lp55231::setEngineModeHold(uint8_t engine)
   return(true);
 }
 
-bool lp55231::setEngineModeStep(uint8_t engine)
+bool lp55231dep::setEngineModeStep(uint8_t engine)
 {
   uint8_t val;
 
@@ -576,7 +628,7 @@ bool lp55231::setEngineModeStep(uint8_t engine)
   return(true);
 }
 
-bool lp55231::setEngineModeOnce(uint8_t engine)
+bool lp55231dep::setEngineModeOnce(uint8_t engine)
 {
   uint8_t val;
 
@@ -605,7 +657,7 @@ bool lp55231::setEngineModeOnce(uint8_t engine)
 
 }
 
-bool lp55231::setEngineModeFree(uint8_t engine)
+bool lp55231dep::setEngineModeFree(uint8_t engine)
 {
   uint8_t val;
 
@@ -630,7 +682,7 @@ bool lp55231::setEngineModeFree(uint8_t engine)
   return(true);
 }
 
-uint8_t lp55231::getEngineMode(uint8_t engine)
+uint8_t lp55231dep::getEngineMode(uint8_t engine)
 {
   uint8_t val;
 
@@ -648,7 +700,7 @@ uint8_t lp55231::getEngineMode(uint8_t engine)
 }
 
 
-bool lp55231::setEngineRunning(uint8_t engine)
+bool lp55231dep::setEngineRunning(uint8_t engine)
 {
   uint8_t val;
 
@@ -670,13 +722,13 @@ bool lp55231::setEngineRunning(uint8_t engine)
 
 
 
-uint8_t lp55231::clearInterrupt()
+uint8_t lp55231dep::clearInterrupt()
 {
   // TBD: make this more channel specific?
   return( readReg(REG_STATUS_IRQ) & 0x07);
 }
 
-void lp55231::waitForBusy()
+void lp55231dep::waitForBusy()
 {
   uint8_t val;
 
@@ -691,7 +743,7 @@ void lp55231::waitForBusy()
 
 /////////////////////////////////////////////////////////////
 
-uint8_t lp55231::readADCInternal(uint8_t channel)
+uint8_t lp55231dep::readADCInternal(uint8_t channel)
 {
   writeReg(REG_TEST_CTL, 0x80 |(channel & 0x1f));
 
@@ -705,34 +757,4 @@ uint8_t lp55231::readADCInternal(uint8_t channel)
 
 }
 
-uint8_t lp55231::readReg(uint8_t reg)
-{
-  // Wire is awkward because it doesn't really have a register address concept.
-  // http://www.arduino.cc/en/Tutorial/SFRRangerReader for reference
-
-  Wire.beginTransmission(_address);
-  Wire.write(reg);
-  Wire.endTransmission(false);// false keeps connection active so we can read.
-
-  delayMicroseconds(10);
-
-  uint8_t status = Wire.requestFrom(_address, (uint8_t)1);
-  if(status)
-  {
-    return(Wire.read());
-  }
-  else
-  {
-    Serial.print("readReg failed? status:");
-    Serial.println(status, HEX);
-  }
-  return 0xff;
-}
-
-void lp55231::writeReg(uint8_t reg, uint8_t val)
-{
-  Wire.beginTransmission(_address);
-  Wire.write(reg);
-  Wire.write(val);
-  Wire.endTransmission();
-}
+#endif

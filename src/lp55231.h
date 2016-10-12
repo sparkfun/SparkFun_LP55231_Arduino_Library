@@ -5,17 +5,47 @@
 
 #include <stdint.h>
 
-class lp55231
+class Lp55231
+{
+public:
+  Lp55231(uint8_t address = 0x32);
+
+
+
+  // Initialization routines
+  void Begin();
+  void Enable();
+  void Disable();
+  void Reset();
+
+
+  bool SetChannelPWM(uint8_t channel, uint8_t value);
+
+  //
+  static const uint8_t NumChannels = 9;
+
+private:
+  // private methods
+  void    WaitForBusy();
+  uint8_t ReadADCInternal(uint8_t channel);
+
+  uint8_t ReadReg(uint8_t reg);
+  void    WriteReg(uint8_t reg, uint8_t val);
+
+  // private data
+  uint8_t _address;
+
+};
+
+#if 0
+class lp55231dep
 {
   public:
 
-    lp55231(uint8_t address = 0x32);
+    lp55231dep(uint8_t address = 0x32);
     void init();
 
     // fundamental operations
-    void enable();
-    void disable();
-    void reset();
     uint8_t clearInterrupt();
 
     // basic LED control functions
@@ -71,5 +101,7 @@ class lp55231
 
 
 };
+
+#endif // if 0
 
 #endif
