@@ -18,8 +18,13 @@ public:
   void Disable();
   void Reset();
 
-
+  // control outputs directly
   bool SetChannelPWM(uint8_t channel, uint8_t value);
+  bool SetMasterFader(uint8_t fader, uint8_t value);
+
+  // Configure outputs
+  bool SetRatiometricDimming(uint8_t channel, bool value);
+  bool AssignChannelToMasterFader(uint8_t channel, uint8_t fader);
 
   //
   static const uint8_t NumChannels = 9;

@@ -156,6 +156,78 @@ bool Lp55231::SetChannelPWM(uint8_t channel, uint8_t value)
   return true;
 }
 
+bool Lp55231::SetMasterFader(uint8_t fader, uint8_t value)
+{
+  if(fader >= 3)
+  {
+    return false;
+  }
+
+  WriteReg(REG_MASTER_FADE_1 + fader, value);
+}
+
+bool Lp55231::SetRatiometricDimming(uint8_t channel, bool value)
+{
+  uint8_t regVal;
+
+  if(channel >= 9)
+  {
+    Serial.println("setLogBrightness: invalid channel");
+    return false;
+  }
+
+  if(channel == 8)
+  {
+    regVal = ReadReg(REG_RATIO_MSB);
+    if(value)
+    {
+      regVal |= 0x01;
+    }
+    else
+    {
+      regVal &= ~0x01;
+    }
+    WriteReg(REG_RATIO_MSB, regVal);
+  }
+  else
+  {
+    regVal = ReadReg(REG_RATIO_LSB);
+    if(value)
+    {
+      regVal |= (0x01 << channel);
+    }
+    else
+    {
+      regVal &= ~(0x01 << channel);
+    }
+    WriteReg(REG_RATIO_LSB, regVal);
+  }
+
+  return true;
+}
+
+bool Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_t fader)
+{
+  uint8_t regVal, bitVal;
+
+  if(channel >= NumChannels)
+  {
+    return false;
+  }
+  else if(fader >= 3)
+  {
+    return false;
+  }
+
+  regVal = ReadReg(REG_D1_CTRL + channel);
+  bitVal = (fader + 1) & 0x03;
+  bitVal <<= 6;
+  regVal &= 0xc0;
+  regVal |= bitVal;
+  WriteReg(REG_D1_CTRL + channel, regVal);
+
+}
+
 /********************************************************************************/
 /**  private member functions. **/
 /********************************************************************************/
@@ -191,6 +263,7 @@ void Lp55231::WriteReg(uint8_t reg, uint8_t val)
   Wire.write(val);
   Wire.endTransmission();
 }
+
 
 
 /********************************************************************************/
