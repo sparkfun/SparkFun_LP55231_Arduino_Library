@@ -12,7 +12,7 @@ static const int32_t interrupt_pin = 16;
 static uint32_t next;
 //static bool     ledon;
 
-static lp55231 ledChip(0x32);
+static Lp55231Engines ledChip(0x32);
 
 /*
  * More trickery at play here (not as tangled as the interrupt example).
@@ -82,20 +82,18 @@ void setup()
 
   pinMode(interrupt_pin, INPUT);
 
-  ledChip.init();
-  ledChip.reset();
-  ledChip.enable();
+  ledChip.Begin();
+  ledChip.Enable();
 
   delay(1000);
 
   for (uint8_t i = 0; i < 9; i++)
   {
-    ledChip.setLogBrightness(i, true);
-    ledChip.setDriveCurrent(i, 111);
+    ledChip.SetLogBrightness(i, true);
+    ledChip.SetDriveCurrent(i, 111);
   }
 
-#if 1
-  if (ledChip.loadProgram(program, 16))
+  if (ledChip.LoadProgram(program, 16))
   {
     Serial.println("Program loaded?");
   }
@@ -103,19 +101,16 @@ void setup()
   {
     Serial.println("Program dodn't load?");
   }
-#endif
 
   next = millis() + 3000;
 
-  ledChip.clearInterrupt();
+  ledChip.ClearInterrupt();
 
-  ledChip.setEngineEntryPoint(0, 0);
-  ledChip.setEnginePC(0, 0);
+  ledChip.SetEngineEntryPoint(0, 0);
+  ledChip.SetEnginePC(0, 0);
 
-  ledChip.setEngineModeFree(0);
-  ledChip.showControls();
-
-  ledChip.setEngineRunning(0);
+  ledChip.SetEngineModeFree(0);
+  ledChip.SetEngineRunning(0);
 
   Serial.println("### Setup complete");
 
@@ -149,23 +144,7 @@ void loop()
     Serial.print(count);
 
     Serial.print(" PC:");
-    Serial.println(ledChip.getEnginePC(0));
-
-    if (count == 1)
-    {
-      //ledChip.fastProgram(program);
-    }
-
-    //    if (count % 4 == 0)
-    //    {
-    //      Serial.println("send trigger");
-    //      digitalWrite(trigger_pin, LOW);
-    //      delay(20);
-    //      digitalWrite(trigger_pin, HIGH);
-    //
-    //      Serial.println(ledChip.getEngineMap(0), HEX);
-    //
-    //    }
+    Serial.println(ledChip.GetEnginePC(0));
 
     count++;
     next += 1000;
