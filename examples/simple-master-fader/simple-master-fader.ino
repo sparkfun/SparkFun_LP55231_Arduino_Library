@@ -42,8 +42,16 @@ void setup() {
   ledChip.AssignChannelToMasterFader(1, 0);
   ledChip.AssignChannelToMasterFader(6, 0);
 
+  ledChip.SetLogBrightness(0, true);
+  ledChip.SetLogBrightness(1, true);
+  ledChip.SetLogBrightness(6, true);
+
+  ledChip.SetDriveCurrent(0, 0xff);
+  ledChip.SetDriveCurrent(1, 0xff);
+  ledChip.SetDriveCurrent(6, 0xff);
+
   ledChip.SetChannelPWM(0,0xff);
-  ledChip.SetChannelPWM(1,0x00);
+  ledChip.SetChannelPWM(1,0x40);
   ledChip.SetChannelPWM(6,0x80);
 
   delay(500);

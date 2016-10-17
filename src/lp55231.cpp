@@ -101,8 +101,6 @@ static const uint8_t REG_GAIN_CHANGE = 0x76;
 // allows direct control over the LED outputs, and basic chip featurers like output current setting,
 /********************************************************************************/
 
-
-
 Lp55231::Lp55231(uint8_t address)
 {
   _address = address;
@@ -141,12 +139,7 @@ void Lp55231::Reset()
 
 bool Lp55231::SetChannelPWM(uint8_t channel, uint8_t value)
 {
-  // Serial.print("setBrt: chan: ");
-  // Serial.print(channel);
-  // Serial.print(" val: ");
-  // Serial.println(value);
-
-  if(channel >= 9)
+  if(channel >= NumChannels)
   {
     Serial.println("setBrightness: invalid channel");
     return false;
@@ -158,7 +151,7 @@ bool Lp55231::SetChannelPWM(uint8_t channel, uint8_t value)
 
 bool Lp55231::SetMasterFader(uint8_t fader, uint8_t value)
 {
-  if(fader >= 3)
+  if(fader >= NumFaders)
   {
     return false;
   }
@@ -166,7 +159,61 @@ bool Lp55231::SetMasterFader(uint8_t fader, uint8_t value)
   WriteReg(REG_MASTER_FADE_1 + fader, value);
 }
 
-bool Lp55231::SetRatiometricDimming(uint8_t channel, bool value)
+bool Lp55231::SetLogBrightness(uint8_t channel, bool enable)
+{
+  uint8_t regVal, bitVal;
+
+  if(channel >= NumChannels)
+  {
+    return false;
+  }
+
+  regVal = ReadReg(REG_D1_CTRL + channel);
+  bitVal = enable?0x20:0x00;
+  regVal &= ~0x20;
+  regVal |= bitVal;
+  WriteReg(REG_D1_CTRL + channel, regVal);
+}
+
+bool Lp55231::SetDriveCurrent(uint8_t channel, uint8_t value)
+{
+  if(channel >= NumChannels)
+  {
+    return false;
+  }
+
+  WriteReg(REG_D1_I_CTL + channel, value);
+  return true;
+}
+
+
+bool Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_t fader)
+{
+  uint8_t regVal, bitVal;
+
+  if(channel >= NumChannels)
+  {
+    return false;
+  }
+  else if(fader >= NumFaders)
+  {
+    return false;
+  }
+
+  regVal = ReadReg(REG_D1_CTRL + channel);
+  bitVal = (fader + 1) & 0x03;
+  bitVal <<= 6;
+  regVal &= ~0xc0;
+  regVal |= bitVal;
+  WriteReg(REG_D1_CTRL + channel, regVal);
+
+}
+
+/********************************************************************************/
+/**  Engine class functions. **/
+/********************************************************************************/
+
+bool Lp55231Engines::SetRatiometricDimming(uint8_t channel, bool value)
 {
   uint8_t regVal;
 
@@ -206,30 +253,378 @@ bool Lp55231::SetRatiometricDimming(uint8_t channel, bool value)
   return true;
 }
 
-bool Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_t fader)
+bool Lp55231Engines::LoadProgram(const uint16_t* prog, uint8_t len)
 {
-  uint8_t regVal, bitVal;
+  uint8_t val;
+  uint8_t page;
 
-  if(channel >= NumChannels)
+  if(len >= NumInstructions)
   {
+    // TBD - support multiple pages
+
+    Serial.println("program too long");
     return false;
   }
-  else if(fader >= 3)
+
+  // temp - try to tell it what to reset to?
+  //writeReg(REG_PROG1_START, 0x08);
+
+  // set up program write
+  // start in execution disabled mode (0b00)
+  // required to get into load mode.
+  // "Load program mode can be entered from the disabled mode only.  be
+  // entered from the disabled mode only."
+  WriteReg(REG_CNTRL2, 0x00);
+  WriteReg(REG_CNTRL2, 0x15);
+
+  WaitForBusy();
+
+  // try to write program from example
+  // datasheet says MSB of each instruction is in earlier address
+  // TBD: could optimize with a sequence of byte writes, using auto increment
+
+  // use auto-increment of chip - enabled in MISC.
+  // If it gets turned off, this breaks.  TBD: set it explicitly?
+
+  // Write complete pages, setting page reg for each.
+  for(page = 0; page < (len/16); page++)
   {
+    WriteReg(REG_PROG_PAGE_SEL, page);
+
+    for(uint8_t i = 0; i < 16; i++)
+    {
+      Wire.beginTransmission(_address);
+      Wire.write((REG_PROG_MEM_BASE + (i*2)));
+      // MSB then LSB
+      Wire.write((prog[(i + (page*16))]>> 8) & 0xff);
+      Wire.write(prog[i + (page*16)] & 0xff);
+      Wire.endTransmission();
+    }
+  }
+
+  // plus any incomplete pages
+  page = len/16;
+  WriteReg(REG_PROG_PAGE_SEL, page);
+  for(uint8_t i = 0; i < (len%16); i++)
+  {
+    Wire.beginTransmission(_address);
+    Wire.write((REG_PROG_MEM_BASE + (i*2)));
+    // MSB then LSB
+    Wire.write((prog[i + (page*16)]>> 8) & 0xff);
+    Wire.write(prog[i + (page*16)] & 0xff);
+    Wire.endTransmission();
+  }
+
+  WriteReg(REG_CNTRL2, 0x00);
+
+  return true;
+}
+
+bool Lp55231Engines::VerifyProgram(const uint16_t* prog, uint8_t len)
+{
+  uint8_t val, page;
+
+  if(len >= NumInstructions)
+  {
+    // TBD - support multiple pages
+
+    Serial.println("Verify program too long");
     return false;
   }
 
-  regVal = ReadReg(REG_D1_CTRL + channel);
-  bitVal = (fader + 1) & 0x03;
-  bitVal <<= 6;
-  regVal &= 0xc0;
-  regVal |= bitVal;
-  WriteReg(REG_D1_CTRL + channel, regVal);
+  WriteReg(REG_CNTRL2, 0x00);// engines into disable mode - required for entry to program mode.
+  WriteReg(REG_CNTRL2, 0x15);// engines into program mode?
+  //try to read  program from chip,
+  // datasheet says MSB of each instruction is in earlier address
+  // TBD: could optimize with a sequence of byte writes, using auto increment
+
+  // Auto-increment may not work for sequential reads...
+  for(page = 0; page < (len/16); page++)
+  {
+    WriteReg(REG_PROG_PAGE_SEL, page);
+
+    for(uint8_t i = 0; i < 16; i++)
+    {
+      uint16_t msb, lsb;
+      uint8_t addr = (REG_PROG_MEM_BASE + (i*2));
+      //Serial.print("Verifying: ");
+      //Serial.println(addr, HEX);
+
+      msb = ReadReg(addr);
+      lsb = ReadReg(addr + 1);
+
+      lsb |= (msb << 8);
+
+      if(lsb != prog[i + (page*16)])
+      {
+        Serial.print("program mismatch.  Idx:");
+        Serial.print(i);
+        Serial.print(" local:");
+        Serial.print(prog[i + (page*16)], HEX);
+        Serial.print(" remote:");
+        Serial.println(lsb, HEX);
+
+        return false;
+      }
+    }
+  }
+
+  // plus any incomplete pages
+  page = len/16;
+  WriteReg(REG_PROG_PAGE_SEL, page);
+  for(uint8_t i = 0; i < (len%16); i++)
+  {
+    uint16_t msb, lsb;
+    uint8_t addr = (REG_PROG_MEM_BASE + (i*2));
+    Serial.print("Verifying: ");
+    Serial.println(addr, HEX);
+
+    msb = ReadReg(addr);
+    lsb = ReadReg(addr + 1);
+
+    lsb |= (msb << 8);
+
+    if(lsb != prog[i + (page*16)])
+    {
+      Serial.print("program mismatch.  Idx:");
+      Serial.print(i);
+      Serial.print(" local:");
+      Serial.print(prog[i + (page*16)], HEX);
+      Serial.print(" remote:");
+      Serial.println(lsb, HEX);
+
+      return false;
+    }
+  }
+
+  WriteReg(REG_CNTRL2, 0x00);
+
+  return true;
+}
+
+bool Lp55231Engines::SetEngineEntryPoint(uint8_t engine, uint8_t addr)
+{
+
+  if(engine >= NumEngines)
+  {
+    Serial.println("Invalid engine num in set EP");
+    return false;
+  }
+
+  WriteReg(REG_PROG1_START + engine, addr);
+
+  return true;
+}
+
+bool Lp55231Engines::SetEnginePC(uint8_t engine, uint8_t addr)
+{
+  uint8_t control_val, control2_val, temp;;
+
+  if(engine >= NumEngines)
+  {
+    Serial.println("Invalid engine num in set PC");
+    return false;
+  }
+
+  // There are 6 pages of 16 instructions each (0..95)
+  if(addr >= NumInstructions)
+  {
+    Serial.println("Invalid addr in set PC");
+    return false;
+  }
+
+  // In Ctl1 descriptions:
+  //00 = hold: Hold causes the execution engine to finish the current instruction and then stop. Program counter
+  //(PC) can be read or written only in this mode.
+
+  control_val = ReadReg(REG_CNTRL1);
+  control2_val = ReadReg(REG_CNTRL2);
+
+  temp = (control_val & ~(0x30 >> (engine * 2)));
+
+  WriteReg(REG_CNTRL2, 0x3ff); // halt engines immediately.
+  WriteReg(REG_CNTRL1, temp);// put engine in load mode
+
+  WriteReg(REG_PC1 + engine, addr);
+
+  // restore prev mode?
+  WriteReg(REG_CNTRL1, control_val);
+  WriteReg(REG_CNTRL2, control2_val);
+
+  return true;
+}
+
+uint8_t Lp55231Engines::GetEnginePC(uint8_t engine)
+{
+  // must set Hold to touch PC...
+  uint8_t control_val, pc_val;
+
+  if(engine > 2)
+  {
+    Serial.println("Invalid engine num in set PC");
+    return -1;
+  }
+
+  pc_val = ReadReg(REG_PC1 + engine);
+
+  return(pc_val);
+}
+
+
+uint8_t Lp55231Engines::GetEngineMode(uint8_t engine)
+{
+  uint8_t val;
+
+  if(engine > 2)
+  {
+    Serial.println("Get engine mode got invalid engine #");
+    return false;
+  }
+
+  val = ReadReg(REG_CNTRL1);
+  val >>= (engine * 2);
+  val &= 0x03;
+  return(val);
 
 }
 
+
+uint8_t Lp55231Engines::GetEngineMap(uint8_t engine)
+{
+  if(engine >= NumEngines)
+  {
+    Serial.println("Invalid engine num in get map");
+    return -1;
+  }
+
+  return(ReadReg(REG_ENG1_MAP_LSB + engine));
+}
+
+bool Lp55231Engines::SetEngineModeHold(uint8_t engine)
+{
+  uint8_t val;
+
+  if(engine >= NumEngines)
+  {
+    Serial.println("Set free got invalid engine #");
+    return false;
+  }
+
+  // Set the enghine to "free running" execution type
+  // bits to 0b00
+  val = ReadReg(REG_CNTRL1);
+  val &= ~(0x30 >> (engine * 2));
+  //val |= (0x10 >> (engine * 2));
+  WriteReg(REG_CNTRL1, val );
+
+  return(true);
+}
+
+bool Lp55231Engines::SetEngineModeStep(uint8_t engine)
+{
+  uint8_t val;
+
+  if(engine >= NumEngines)
+  {
+    Serial.println("Set free got invalid engine #");
+    return false;
+  }
+
+  // Set the enghine to "single step" execution type
+  // bits to 0b01
+  val = ReadReg(REG_CNTRL1);
+  val &= ~(0x30 >> (engine * 2));
+  val |= (0x10 >> (engine * 2));
+  WriteReg(REG_CNTRL1, val );
+
+  return(true);
+}
+
+bool Lp55231Engines::SetEngineModeOnce(uint8_t engine)
+{
+  uint8_t val;
+
+  // This mode might not be the most useful.
+  // It executes the pointed instruction, then
+  // sets exec mode to hold, and resets the PC.
+  // It's an astringent form of step (which advances the PC, instead)
+
+  if(engine >= NumEngines)
+  {
+    Serial.println("Set one shot got invalid engine #");
+    return false;
+  }
+
+  // Set the enghine to "one shot" execution type
+  // Bits to 0b11
+  val = ReadReg(REG_CNTRL1);
+  val |= (0x30 >> (engine * 2));
+
+  Serial.print("C1: ");
+  Serial.println(val, HEX);
+
+  WriteReg(REG_CNTRL1, val );
+
+  return(true);
+
+}
+
+bool Lp55231Engines::SetEngineModeFree(uint8_t engine)
+{
+  uint8_t val;
+
+  if(engine >= NumEngines)
+  {
+    Serial.println("Set free got invalid engine #");
+    return false;
+  }
+
+  // Set the enghine to "free running" execution type
+  val = ReadReg(REG_CNTRL1);
+  val &= ~(0x30 >> (engine * 2));
+  val |= (0x20 >> (engine * 2));
+
+  // Serial.print("Free: ");
+  // Serial.print(engine, HEX);
+  // Serial.print(" ");
+  // Serial.println(val, HEX);
+
+  WriteReg(REG_CNTRL1, val );
+
+  return(true);
+}
+
+bool Lp55231Engines::SetEngineRunning(uint8_t engine)
+{
+  uint8_t val;
+
+  if(engine >= NumEngines)
+  {
+    Serial.println("Set running got invalid engine #");
+    return false;
+  }
+
+  // This assumes that a suitable run mode in CNTRL1 was already selected.
+  // start execution by setting "run program" mode
+  val = ReadReg(REG_CNTRL2);
+  val &= ~(0x30 >> (engine * 2));
+  val |= (0x20>> (engine * 2));
+  WriteReg(REG_CNTRL2, val);
+
+  return true;
+}
+
+
+
+
+
+
+
+
+
+
 /********************************************************************************/
-/**  private member functions. **/
+/**  private base class member functions. **/
 /********************************************************************************/
 
 uint8_t Lp55231::ReadReg(uint8_t reg)
@@ -265,6 +660,29 @@ void Lp55231::WriteReg(uint8_t reg, uint8_t val)
 }
 
 
+/********************************************************************************/
+/**  private derived class member functions. **/
+/********************************************************************************/
+
+void Lp55231Engines::WaitForBusy()
+{
+  uint8_t val;
+
+  // then wait to change modes
+  do
+  {
+    val = ReadReg(REG_STATUS_IRQ) & 0x10; // engine busy bit
+  }
+  while(val);
+
+}
+
+uint8_t Lp55231Engines::ClearInterrupt()
+{
+  // TBD: make this more channel specific?
+  return( ReadReg(REG_STATUS_IRQ) & 0x07);
+}
+
 
 /********************************************************************************/
 /**  old code below. **/
@@ -274,30 +692,7 @@ void Lp55231::WriteReg(uint8_t reg, uint8_t val)
 
 
 
-bool lp55231dep::setLogBrightness(uint8_t channel)
-{
-  if(channel >= 9)
-  {
-    Serial.println("setLogBrightness: invalid channel");
-    return false;
-  }
 
-  writeReg(REG_D1_CTRL + channel, 20);
-  return true;
-}
-
-bool lp55231dep::setDriveCurrent(uint8_t channel, uint8_t value)
-{
-  if(channel > 9)
-  {
-    Serial.println("setLogBrightness: invalid channel");
-    return false;
-  }
-
-  // tbd...
-  writeReg(REG_D1_I_CTL + channel, value);
-  return true;
-}
 
 int8_t lp55231dep::readDegC()
 {
@@ -413,406 +808,15 @@ bool lp55231dep::setIntGPOVal(bool value)
 
 
 
-bool lp55231dep::setMasterFader(uint8_t engine, uint8_t value)
-{
-  if((engine == 0) || (engine > 3))
-  {
-    Serial.println("setMasterFader: invalid engine");
-    return false;
-  }
 
-  writeReg(REG_MASTER_FADE_1 + (engine - 1 ), value);
-  return true;
-}
 
-void lp55231dep::showControls()
-{
- Serial.print("Control regs: ");
- Serial.print(readReg(REG_CNTRL1) & 0xff, HEX);
- Serial.print(" ");
- Serial.println(readReg(REG_CNTRL2) & 0xff, HEX);
-}
 
-bool lp55231dep::loadProgram(const uint16_t* prog, uint8_t len)
-{
-  uint8_t val;
-  uint8_t page;
 
-  if(len > 96)
-  {
-    // TBD - support multiple pages
 
-    Serial.println("program too long");
-    return false;
-  }
 
-  // temp - try to tell it what to reset to?
-  //writeReg(REG_PROG1_START, 0x08);
 
-  // set up program write
-  // start in execution disabled mode (0b00)
-  // required to get into load mode.
-  // "Load program mode can be entered from the disabled mode only.  be
-  // entered from the disabled mode only."
-  writeReg(REG_CNTRL2, 0x00);
-  writeReg(REG_CNTRL2, 0x15);
 
-  waitForBusy();
 
-  // try to write program from example
-  // datasheet says MSB of each instruction is in earlier address
-  // TBD: could optimize with a sequence of byte writes, using auto increment
-
-  // use auto-increment of chip - enabled in MISC.
-  // If it gets turned off, this breaks.  TBD: set it explicitly?
-
-  // Write complete pages, setting page reg for each.
-  for(page = 0; page < (len/16); page++)
-  {
-    writeReg(REG_PROG_PAGE_SEL, page);
-
-    for(uint8_t i = 0; i < 16; i++)
-    {
-      Wire.beginTransmission(_address);
-      Wire.write((REG_PROG_MEM_BASE + (i*2)));
-      // MSB then LSB
-      Wire.write((prog[(i + (page*16))]>> 8) & 0xff);
-      Wire.write(prog[i + (page*16)] & 0xff);
-      Wire.endTransmission();
-    }
-  }
-
-  // plus any incomplete pages
-  page = len/16;
-  writeReg(REG_PROG_PAGE_SEL, page);
-  for(uint8_t i = 0; i < (len%16); i++)
-  {
-    Wire.beginTransmission(_address);
-    Wire.write((REG_PROG_MEM_BASE + (i*2)));
-    // MSB then LSB
-    Wire.write((prog[i + (page*16)]>> 8) & 0xff);
-    Wire.write(prog[i + (page*16)] & 0xff);
-    Wire.endTransmission();
-  }
-
-  writeReg(REG_CNTRL2, 0x00);
-
-  return true;
-}
-
-bool lp55231dep::verifyProgram(const uint16_t* prog, uint8_t len)
-{
-  uint8_t val, page;
-
-  if(len > 96)
-  {
-    // TBD - support multiple pages
-
-    Serial.println("Verify program too long");
-    return false;
-  }
-
-  writeReg(REG_CNTRL2, 0x00);// engines into disable mode - required for entry to program mode.
-  writeReg(REG_CNTRL2, 0x15);// engines into program mode?
-  //try to read  program from chip,
-  // datasheet says MSB of each instruction is in earlier address
-  // TBD: could optimize with a sequence of byte writes, using auto increment
-
-  // Auto-increment may not work for sequential reads...
-  for(page = 0; page < (len/16); page++)
-  {
-    writeReg(REG_PROG_PAGE_SEL, page);
-
-    for(uint8_t i = 0; i < 16; i++)
-    {
-      uint16_t msb, lsb;
-      uint8_t addr = (REG_PROG_MEM_BASE + (i*2));
-      //Serial.print("Verifying: ");
-      //Serial.println(addr, HEX);
-
-      msb = readReg(addr);
-      lsb = readReg(addr + 1);
-
-      lsb |= (msb << 8);
-
-      if(lsb != prog[i + (page*16)])
-      {
-        Serial.print("program mismatch.  Idx:");
-        Serial.print(i);
-        Serial.print(" local:");
-        Serial.print(prog[i + (page*16)], HEX);
-        Serial.print(" remote:");
-        Serial.println(lsb, HEX);
-
-        return false;
-      }
-    }
-  }
-
-  // plus any incomplete pages
-  page = len/16;
-  writeReg(REG_PROG_PAGE_SEL, page);
-  for(uint8_t i = 0; i < (len%16); i++)
-  {
-    uint16_t msb, lsb;
-    uint8_t addr = (REG_PROG_MEM_BASE + (i*2));
-    Serial.print("Verifying: ");
-    Serial.println(addr, HEX);
-
-    msb = readReg(addr);
-    lsb = readReg(addr + 1);
-
-    lsb |= (msb << 8);
-
-    if(lsb != prog[i + (page*16)])
-    {
-      Serial.print("program mismatch.  Idx:");
-      Serial.print(i);
-      Serial.print(" local:");
-      Serial.print(prog[i + (page*16)], HEX);
-      Serial.print(" remote:");
-      Serial.println(lsb, HEX);
-
-      return false;
-    }
-  }
-
-  writeReg(REG_CNTRL2, 0x00);
-
-  return true;
-}
-
-bool lp55231dep::setEngineEntryPoint(uint8_t engine, uint8_t addr)
-{
-
-  if(engine > 2)
-  {
-    Serial.println("Invalid engine num in set EP");
-    return false;
-  }
-
-  writeReg(REG_PROG1_START + engine, addr);
-
-  return true;
-}
-
-bool lp55231dep::setEnginePC(uint8_t engine, uint8_t addr)
-{
-  uint8_t control_val, control2_val, temp;;
-
-  if(engine > 2)
-  {
-    Serial.println("Invalid engine num in set PC");
-    return false;
-  }
-
-  // There are 6 pages of 16 instructions each (0..95)
-  if(addr >= 96)
-  {
-    Serial.println("Invalid addr in set PC");
-    return false;
-  }
-
-  // In Ctl1 descriptions:
-  //00 = hold: Hold causes the execution engine to finish the current instruction and then stop. Program counter
-  //(PC) can be read or written only in this mode.
-
-  control_val = readReg(REG_CNTRL1);
-  control2_val = readReg(REG_CNTRL2);
-
-  temp = (control_val & ~(0x30 >> (engine * 2)));
-
-  writeReg(REG_CNTRL2, 0x3ff); // halt engines immediately.
-  writeReg(REG_CNTRL1, temp);// put engine in load mode
-
-  writeReg(REG_PC1 + engine, addr);
-
-  // restore prev mode?
-  writeReg(REG_CNTRL1, control_val);
-  writeReg(REG_CNTRL2, control2_val);
-
-  return true;
-}
-
-uint8_t lp55231dep::getEnginePC(uint8_t engine)
-{
-  // must set Hold to touch PC...
-  uint8_t control_val, pc_val;
-
-  if(engine > 2)
-  {
-    Serial.println("Invalid engine num in set PC");
-    return -1;
-  }
-
-  pc_val = readReg(REG_PC1 + engine);
-
-  return(pc_val);
-}
-
-uint8_t lp55231dep::getEngineMap(uint8_t engine)
-{
-  if(engine > 2)
-  {
-    Serial.println("Invalid engine num in get map");
-    return -1;
-  }
-
-  return(readReg(REG_ENG1_MAP_LSB + engine));
-}
-
-bool lp55231dep::setEngineModeHold(uint8_t engine)
-{
-  uint8_t val;
-
-  if(engine > 2)
-  {
-    Serial.println("Set free got invalid engine #");
-    return false;
-  }
-
-  // Set the enghine to "free running" execution type
-  // bits to 0b00
-  val = readReg(REG_CNTRL1);
-  val &= ~(0x30 >> (engine * 2));
-  //val |= (0x10 >> (engine * 2));
-  writeReg(REG_CNTRL1, val );
-
-  return(true);
-}
-
-bool lp55231dep::setEngineModeStep(uint8_t engine)
-{
-  uint8_t val;
-
-  if(engine > 2)
-  {
-    Serial.println("Set free got invalid engine #");
-    return false;
-  }
-
-  // Set the enghine to "single step" execution type
-  // bits to 0b01
-  val = readReg(REG_CNTRL1);
-  val &= ~(0x30 >> (engine * 2));
-  val |= (0x10 >> (engine * 2));
-  writeReg(REG_CNTRL1, val );
-
-  return(true);
-}
-
-bool lp55231dep::setEngineModeOnce(uint8_t engine)
-{
-  uint8_t val;
-
-  // This mode might not be the most useful.
-  // It executes the pointed instruction, then
-  // sets exec mode to hold, and resets the PC.
-  // It's an astringent form of step (which advances the PC, instead)
-
-  if(engine > 2)
-  {
-    Serial.println("Set one shot got invalid engine #");
-    return false;
-  }
-
-  // Set the enghine to "one shot" execution type
-  // Bits to 0b11
-  val = readReg(REG_CNTRL1);
-  val |= (0x30 >> (engine * 2));
-
-  Serial.print("C1: ");
-  Serial.println(val, HEX);
-
-  writeReg(REG_CNTRL1, val );
-
-  return(true);
-
-}
-
-bool lp55231dep::setEngineModeFree(uint8_t engine)
-{
-  uint8_t val;
-
-  if(engine > 2)
-  {
-    Serial.println("Set free got invalid engine #");
-    return false;
-  }
-
-  // Set the enghine to "free running" execution type
-  val = readReg(REG_CNTRL1);
-  val &= ~(0x30 >> (engine * 2));
-  val |= (0x20 >> (engine * 2));
-
-  // Serial.print("Free: ");
-  // Serial.print(engine, HEX);
-  // Serial.print(" ");
-  // Serial.println(val, HEX);
-
-  writeReg(REG_CNTRL1, val );
-
-  return(true);
-}
-
-uint8_t lp55231dep::getEngineMode(uint8_t engine)
-{
-  uint8_t val;
-
-  if(engine > 2)
-  {
-    Serial.println("Get engine mode got invalid engine #");
-    return false;
-  }
-
-  val = readReg(REG_CNTRL1);
-  val >>= (engine * 2);
-  val &= 0x03;
-  return(val);
-
-}
-
-
-bool lp55231dep::setEngineRunning(uint8_t engine)
-{
-  uint8_t val;
-
-  if(engine > 2)
-  {
-    Serial.println("Set running got invalid engine #");
-    return false;
-  }
-
-  // This assumes that a suitable run mode in CNTRL1 was already selected.
-  // start execution by setting "run program" mode
-  val = readReg(REG_CNTRL2);
-  val &= ~(0x30 >> (engine * 2));
-  val |= (0x20>> (engine * 2));
-  writeReg(REG_CNTRL2, val);
-
-  return true;
-}
-
-
-
-uint8_t lp55231dep::clearInterrupt()
-{
-  // TBD: make this more channel specific?
-  return( readReg(REG_STATUS_IRQ) & 0x07);
-}
-
-void lp55231dep::waitForBusy()
-{
-  uint8_t val;
-
-  // then wait to change modes
-  do
-  {
-    val = readReg(REG_STATUS_IRQ) & 0x10; // engine busy bit
-  }
-  while(val);
-
-}
 
 /////////////////////////////////////////////////////////////
 
