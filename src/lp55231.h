@@ -74,16 +74,16 @@ public:
 
   // Interrupt related
   uint8_t ClearInterrupt();
-  void overrideIntToGPO(bool overrideOn );
-  bool setIntGPOVal(bool value);
+  void OverrideIntToGPO(bool overrideOn );
+  bool SetIntGPOVal(bool value);
 
 
   // Internal diagnostic features
-  int8_t readDegC();
-  float  readLEDADC(uint8_t channel);
-  float  readVoutADC();
-  float  readVddADC();
-  float  readIntADC();
+  int8_t ReadDegC();
+  float  ReadLEDADC(uint8_t channel);
+  float  ReadVoutADC();
+  float  ReadVddADC();
+  float  ReadIntADC();
 
 
 private:

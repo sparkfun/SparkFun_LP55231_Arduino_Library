@@ -210,20 +210,22 @@ bool Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_t fader)
 }
 
 /********************************************************************************/
-/**  Engine class functions. **/
+/**  Engine related derived class functions. **/
 /********************************************************************************/
 
+// Ratiometric dimming is similar to master fader, but when LEDs are driven by
+// Execution engines.
 bool Lp55231Engines::SetRatiometricDimming(uint8_t channel, bool value)
 {
   uint8_t regVal;
 
-  if(channel >= 9)
+  if(channel >= NumChannels)
   {
     Serial.println("setLogBrightness: invalid channel");
     return false;
   }
 
-  if(channel == 8)
+  if(channel == NumChannels - 1)
   {
     regVal = ReadReg(REG_RATIO_MSB);
     if(value)
@@ -260,14 +262,9 @@ bool Lp55231Engines::LoadProgram(const uint16_t* prog, uint8_t len)
 
   if(len >= NumInstructions)
   {
-    // TBD - support multiple pages
-
     Serial.println("program too long");
     return false;
   }
-
-  // temp - try to tell it what to reset to?
-  //writeReg(REG_PROG1_START, 0x08);
 
   // set up program write
   // start in execution disabled mode (0b00)
@@ -459,7 +456,7 @@ uint8_t Lp55231Engines::GetEnginePC(uint8_t engine)
   // must set Hold to touch PC...
   uint8_t control_val, pc_val;
 
-  if(engine > 2)
+  if(engine >= NumEngines)
   {
     Serial.println("Invalid engine num in set PC");
     return -1;
@@ -475,7 +472,7 @@ uint8_t Lp55231Engines::GetEngineMode(uint8_t engine)
 {
   uint8_t val;
 
-  if(engine > 2)
+  if(engine >= NumEngines)
   {
     Serial.println("Get engine mode got invalid engine #");
     return false;
@@ -615,11 +612,128 @@ bool Lp55231Engines::SetEngineRunning(uint8_t engine)
 }
 
 
+/********************************************************************************/
+/**  Derived class - interrupt related functions. **/
+/********************************************************************************/
+
+uint8_t Lp55231Engines::ClearInterrupt()
+{
+  // TBD: make this more channel specific?
+  return( ReadReg(REG_STATUS_IRQ) & 0x07);
+}
+
+void Lp55231Engines::OverrideIntToGPO(bool overrideOn )
+{
+  uint8_t regVal;
+
+  if(overrideOn)
+  {
+      regVal = 0x04;
+  }
+  else
+  {
+    regVal = 0;
+  }
+
+  WriteReg(REG_INT_GPIO, regVal);
+}
+
+bool Lp55231Engines::SetIntGPOVal(bool value)
+{
+  uint8_t regVal;
+
+  regVal = ReadReg(REG_INT_GPIO);
+
+  if (!(regVal & 0x04))
+  {
+    return false;
+  }
+
+  if(value)
+  {
+    regVal |= 0x01;
+  }
+  else
+  {
+    regVal &= ~0x01;
+  }
+
+  WriteReg(REG_INT_GPIO, regVal);
+}
 
 
+/********************************************************************************/
+/**  Derived class - Diagnostic functions. **/
+/********************************************************************************/
 
+int8_t Lp55231Engines::ReadDegC()
+{
+  uint8_t status;
+  int8_t  temperature;
 
+  WriteReg(REG_TEMP_CTL, 0x04);
 
+  do
+  {
+    status = ReadReg(REG_TEMP_CTL);
+    //Serial.print(".");
+  }while(status & 0x80);
+
+  temperature = (int8_t)ReadReg(REG_TEMP_READ);
+
+  return temperature;
+}
+
+float  Lp55231Engines::ReadLEDADC(uint8_t channel)
+{
+  uint8_t reading;
+  float volts;
+
+  if(channel >= NumChannels)
+  {
+    return 0.0;
+  }
+
+  reading = ReadADCInternal(channel & 0x0f);
+
+  volts = (reading * 0.03) - 1.478;
+  return volts;
+}
+
+float  Lp55231Engines::ReadVoutADC()
+{
+  uint8_t reading;
+  float volts;
+
+  reading = ReadADCInternal(0x0f);
+
+  volts = (reading * 0.03) - 1.478;
+  return volts;
+}
+
+float  Lp55231Engines::ReadVddADC()
+{
+  uint8_t reading;
+  float volts;
+
+  reading = ReadADCInternal(0x10);
+
+  volts = (reading * 0.03) - 1.478;
+  return volts;
+}
+
+float  Lp55231Engines::ReadIntADC()
+{
+  // reads voltage at interrupt pin
+
+  uint8_t reading;
+  float volts;
+
+  reading = ReadADCInternal(0x11);
+
+  volts = (reading * 0.03) - 1.478;
+  return volts;
+}
 
 
 
@@ -677,161 +791,15 @@ void Lp55231Engines::WaitForBusy()
 
 }
 
-uint8_t Lp55231Engines::ClearInterrupt()
+
+
+uint8_t Lp55231Engines::ReadADCInternal(uint8_t channel)
 {
-  // TBD: make this more channel specific?
-  return( ReadReg(REG_STATUS_IRQ) & 0x07);
-}
-
-
-/********************************************************************************/
-/**  old code below. **/
-/********************************************************************************/
-
-#if 0
-
-
-
-
-
-int8_t lp55231dep::readDegC()
-{
-  uint8_t status;
-  int8_t  temperature;
-
-  writeReg(REG_TEMP_CTL, 0x04);
-
-  do
-  {
-    status = readReg(REG_TEMP_CTL);
-    //Serial.print(".");
-  }while(status & 0x80);
-
-  temperature = (int8_t)readReg(REG_TEMP_READ);
-
-  return temperature;
-}
-
-float  lp55231dep::readLEDADC(uint8_t channel)
-{
-  uint8_t reading;
-  float volts;
-#if 0
-  writeReg(REG_TEST_CTL, 0x80 |(channel & 0x0f));
+  WriteReg(REG_TEST_CTL, 0x80 |(channel & 0x1f));
 
   // No reg bit to poll for completing - simply delay.
   delay(3);
 
-  reading = readReg(REG_TEST_ADC);
-
-
-#else
-  reading = readADCInternal(channel & 0x0f);
-
-  volts = (reading * 0.03) - 1.478;
-#endif
-  return volts;
-}
-
-float  lp55231dep::readVoutADC()
-{
-  uint8_t reading;
-  float volts;
-
-  reading = readADCInternal(0x0f);
-
-  volts = (reading * 0.03) - 1.478;
-  return volts;
-}
-
-float  lp55231dep::readVddADC()
-{
-  uint8_t reading;
-  float volts;
-
-  reading = readADCInternal(0x10);
-
-  volts = (reading * 0.03) - 1.478;
-  return volts;
-}
-
-float  lp55231dep::readIntADC()
-{
-  uint8_t reading;
-  float volts;
-
-  reading = readADCInternal(0x11);
-
-  volts = (reading * 0.03) - 1.478;
-  return volts;
-}
-
-void lp55231dep::overrideIntToGPO(bool overrideOn )
-{
-  uint8_t regVal;
-
-  if(overrideOn)
-  {
-      regVal = 0x04;
-  }
-  else
-  {
-    regVal = 0;
-  }
-
-  writeReg(REG_INT_GPIO, regVal);
-}
-
-bool lp55231dep::setIntGPOVal(bool value)
-{
-  uint8_t regVal;
-
-  regVal = readReg(REG_INT_GPIO);
-
-  if (!(regVal & 0x04))
-  {
-    return false;
-  }
-
-  if(value)
-  {
-    regVal |= 0x01;
-  }
-  else
-  {
-    regVal &= ~0x01;
-  }
-
-  writeReg(REG_INT_GPIO, regVal);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/////////////////////////////////////////////////////////////
-
-uint8_t lp55231dep::readADCInternal(uint8_t channel)
-{
-  writeReg(REG_TEST_CTL, 0x80 |(channel & 0x1f));
-
-  // No reg bit to poll for completing - simply delay.
-  delay(3);
-
-  return(readReg(REG_TEST_ADC));
-
-  //volts = (reading * 0.03) - 1.478;
-
+  return(ReadReg(REG_TEST_ADC));
 
 }
-
-#endif
