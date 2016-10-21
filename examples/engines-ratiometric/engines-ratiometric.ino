@@ -1,3 +1,54 @@
+/******************************************************************************
+Engines-ratiometric.ino
+Using the ratiometric bit to achieve engine-cntrolled ratiometric-color fades
+
+Byron Jacquot @ SparkFun Electronics
+October 21, 2016
+https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library
+
+
+
+Ratiometric control is similar to the master-fader option, but applies
+when outputs are under control of an execution engine.
+
+Normally, when multiple outputs are mapped to an engine, they all get the
+same value, as the engine only produces a single value.  If you map all 3 colors
+of an RGB LED to an engine, the result will be white (the mix of equal amounts of RG & B)
+
+If you want a specific mix of colors under engine control, you need to set up
+that mix using the direct PWM registers, and set the channels to ratiometric
+mode.
+
+Then, the engine output value is multiplied by the PWM register values to
+calculate the resulting blend.  The result is that the engine brightness is
+scaled proportionally by the channel values, and the color of illumination
+will be consistent, and it's brightness will vary.
+
+In setup, the channel is set to ratiometric mode with the SetRatiometricDimming
+method.  Also, the direct control registers need to be programmed for the
+desired ratios using SetChannelPWM.
+
+Then the engine is programmed and started.
+
+This example products pastel output colors - light blue, light green and pink.
+If you turn off the Ratiometric setting, they revert to white.
+
+Resources:
+Written using SparkFun Pro Micro controller, with LP55231 breakout board.
+
+Development environment specifics:
+Written using Arduino 1.6.5
+
+This code is released under the [MIT License](http://opensource.org/licenses/MIT).
+
+Please review the LICENSE.md file included with this example. If you have any questions
+or concerns with licensing, please contact techsupport@sparkfun.com.
+
+Distributed as-is; no warranty is given.
+******************************************************************************/
+
+
+
 #include <lp55231.h>
 
 #include <Wire.h>
@@ -14,37 +65,6 @@ static uint32_t next;
 
 static Lp55231Engines ledChip(0x32);
 
-/*
- * More trickery at play here (not as tangled as the interrupt example).
- *
- * The LP55231 trigger line can be used as both an input and an output.
- * This example does exactly that...bit at first,v we couldn't explain why it worked.
- *
- * The Trigger instruction on the LP allows for it listen for a trigger, or to drive
- * the trigger line.  If both options are used in the same instruction, it sends a
- * short (roughly 100 uSec) trigger pulse, then waits for a response.
- *
- * This sketch waits until it sees that pulse, observes it going high again, then
- * drives the line.
- *
- * But it wasn't entirely apparent why & how it was working.  The AVR port pin
- * architecture held the explanation.
- *
- * The trigger pin on the pro micro is configured as INPUT_PULLUP in
- * setup().  Loop polls that pin, looking for a low.  When it finds a low, it waits for
- * it to go high again, waits a touch longer, the drives it low itself.
- *
- * Yes, it's an input...but it's allowed to drive it low, but somewhat indirectly.
- *
- * When configured as an output, the data bits enable the pullup resistors.
- *
- * So by writing a low to the output pin, we essentially defeat the pullup.
- * The Trigger line is pulled low on the LP breakout, which takes over when the
- * PUP is defeated.
- *
- * This will probably work with other AVR based microcontrollers, but
- * might not be portable beynd that.
- */
 
 static const uint16_t program[] =
 {

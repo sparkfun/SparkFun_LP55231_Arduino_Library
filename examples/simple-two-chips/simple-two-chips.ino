@@ -1,3 +1,34 @@
+/******************************************************************************
+simple-two-chips.ino
+simple demo of using two LP55231s in parallel to control 18 LEDs.
+Byron Jacquot @ SparkFun Electronics
+October 21, 2016
+https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library
+
+Demonstration of two LP55231s on an I2C bus.
+
+Two Lp55231 objects are declared, at unique I2C addresses.  The program then
+writes different values to each chip, resulting an a chase pattern in which one
+chip appears to be a step behind the other.
+
+Resources:
+Written using SparkFun Pro Micro controller, with two LP55231 breakout boards.
+
+The second Lp55231 board is configured for address 0x33, and the first board has
+the I2C pullup resistors disconnected.
+
+Development environment specifics:
+Written using Arduino 1.6.5
+
+
+This code is released under the [MIT License](http://opensource.org/licenses/MIT).
+
+Please review the LICENSE.md file included with this example. If you have any questions
+or concerns with licensing, please contact techsupport@sparkfun.com.
+
+Distributed as-is; no warranty is given.
+******************************************************************************/
+
 #include <lp55231.h>
 
 #include <Wire.h>

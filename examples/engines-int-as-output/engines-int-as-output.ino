@@ -1,3 +1,34 @@
+/******************************************************************************
+Engines-int-as-output.ino
+Overriding the interrupt pin as a general-purpose output.
+Byron Jacquot @ SparkFun Electronics
+October 21, 2016
+https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library
+
+This is a simple example of an esiteric feature.
+
+We're repurposing the interrupt pin (normally tied to the execution engines)
+as a general purpose output, under control of the host microcontroller.
+
+The host takes control of it by calling `OverrideIntToGPO()`.
+
+It can then set the output state of the pin by calling `SetIntGPOVal()`
+
+
+Resources:
+Written using SparkFun Pro Micro controller, with LP55231 breakout board.
+
+Development environment specifics:
+Written using Arduino 1.6.5
+
+This code is released under the [MIT License](http://opensource.org/licenses/MIT).
+
+Please review the LICENSE.md file included with this example. If you have any questions
+or concerns with licensing, please contact techsupport@sparkfun.com.
+
+Distributed as-is; no warranty is given.
+******************************************************************************/
+
 #include <lp55231.h>
 
 #include <Wire.h>
@@ -9,15 +40,6 @@ static const int32_t interrupt_pin = 16;
 
 static uint32_t next;
 static Lp55231Engines ledChip(0x32);
-
-// This is a simple example of an esiteric feature.
-//
-// We're repurposing the interrupt pin (normally tied to the execution engines)
-// as a general purpose output, under control of the host microcontroller.
-//
-// The host takes control of it by calling `OverrideIntToGPO()`.
-// It can then set the output state of the pin by calling `SetIntGPOVal()`
-
 
 void setup()
 {

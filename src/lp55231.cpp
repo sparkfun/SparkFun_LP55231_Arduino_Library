@@ -1,3 +1,31 @@
+/******************************************************************************
+lp55231.cpp
+Implementation file for LP55231 breakout board Arduino Library.
+
+Byron Jacquot @ SparkFun Electronics
+October 21, 2016
+https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library
+
+Arduino library supporting LP55231 breakout board.
+
+Can be instanciated two different ways:
+As an Lp55231 object, offering simple control over the IC, with minimum ROM footprint.
+As an Lp55231Engines object, adding diagnostic and execution engine support.
+
+Resources:
+Written using SparkFun Pro Micro controller, with an LP55231 breakout board.
+Development environment specifics:
+Written using Arduino 1.6.5
+
+This code is released under the [MIT License](http://opensource.org/licenses/MIT).
+
+Please review the LICENSE.md file included with this example. If you have any questions
+or concerns with licensing, please contact techsupport@sparkfun.com.
+
+Distributed as-is; no warranty is given.
+******************************************************************************/
+
+
 #include <Arduino.h>
 #include <Wire.h>
 

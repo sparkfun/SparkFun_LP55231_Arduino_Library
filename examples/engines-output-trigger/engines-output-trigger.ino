@@ -1,3 +1,57 @@
+/******************************************************************************
+Engines-output-trigger.ino
+Application demonstrating trigger pin for bidirectional signal to/from host.
+Byron Jacquot @ SparkFun Electronics
+October 21, 2016
+https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library
+
+
+More trickery at play here (though not as tangled as the interrupt example).
+
+The LP55231 trigger line can be used as both an input and an output.
+This example does exactly that...but at first, we couldn't explain why it worked.
+
+The Trigger instruction on the LP allows for it listen for a trigger, or to drive
+the trigger line.  If both options are used in the same instruction, it sends a
+short (roughly 100 uSec) trigger pulse, then waits for a response.
+
+This sketch waits until it sees that pulse, observes it going high again, then
+drives the line.
+
+But it wasn't entirely apparent why & how it was working.  The AVR port pin
+architecture held the explanation.
+
+The trigger pin on the pro micro is configured as INPUT_PULLUP in
+setup().  Loop polls that pin, looking for a low.  When it finds a low, it waits for
+it to go high again, waits a touch longer, the drives it low itself.
+
+Yes, it's an input...but it's allowed to drive it low, but somewhat indirectly.
+
+When configured as an output, the data bits enable the pullup resistors.
+
+So by writing a low to the output pin, we essentially defeat the pullup.
+The Trigger line is pulled low on the LP breakout, which takes over when the
+PUP is defeated.
+
+This will probably work with other AVR based microcontrollers, but
+might not be portable beynd that.
+
+
+Resources:
+Written using SparkFun Pro Micro controller, with LP55231 breakout board.
+
+Development environment specifics:
+Written using Arduino 1.6.5
+
+This code is released under the [MIT License](http://opensource.org/licenses/MIT).
+
+Please review the LICENSE.md file included with this example. If you have any questions
+or concerns with licensing, please contact techsupport@sparkfun.com.
+
+Distributed as-is; no warranty is given.
+******************************************************************************/
+
+
 #include <lp55231.h>
 
 #include <Wire.h>
@@ -14,37 +68,6 @@ static uint32_t next;
 
 static Lp55231Engines ledChip(0x32);
 
-/*
- * More trickery at play here (not as tangled as the interrupt example).
- *
- * The LP55231 trigger line can be used as both an input and an output.
- * This example does exactly that...bit at first,v we couldn't explain why it worked.
- *
- * The Trigger instruction on the LP allows for it listen for a trigger, or to drive
- * the trigger line.  If both options are used in the same instruction, it sends a
- * short (roughly 100 uSec) trigger pulse, then waits for a response.
- *
- * This sketch waits until it sees that pulse, observes it going high again, then
- * drives the line.
- *
- * But it wasn't entirely apparent why & how it was working.  The AVR port pin
- * architecture held the explanation.
- *
- * The trigger pin on the pro micro is configured as INPUT_PULLUP in
- * setup().  Loop polls that pin, looking for a low.  When it finds a low, it waits for
- * it to go high again, waits a touch longer, the drives it low itself.
- *
- * Yes, it's an input...but it's allowed to drive it low, but somewhat indirectly.
- *
- * When configured as an output, the data bits enable the pullup resistors.
- *
- * So by writing a low to the output pin, we essentially defeat the pullup.
- * The Trigger line is pulled low on the LP breakout, which takes over when the
- * PUP is defeated.
- *
- * This will probably work with other AVR based microcontrollers, but
- * might not be portable beynd that.
- */
 
 static const uint16_t program[] =
 {

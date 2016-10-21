@@ -1,3 +1,32 @@
+/******************************************************************************
+Engines-scaner.ino
+9-channel LED scanner using LP55231.
+
+Byron Jacquot @ SparkFun Electronics
+October 21, 2016
+https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library
+
+
+Using output maps for the execution engine, sequentially cycles through the 9
+LED outputs, resulting in a scrolling pattern.  See the LP55231 breakout board
+hookup guide for a  detailed examination of how this works.
+
+
+Resources:
+Written using SparkFun Pro Micro controller, with LP55231 breakout board.
+
+Development environment specifics:
+Written using Arduino 1.6.5
+
+This code is released under the [MIT License](http://opensource.org/licenses/MIT).
+
+Please review the LICENSE.md file included with this example. If you have any questions
+or concerns with licensing, please contact techsupport@sparkfun.com.
+
+Distributed as-is; no warranty is given.
+******************************************************************************/
+
+
 #include <Wire.h>
 
 #include <lp55231.h>

@@ -1,40 +1,68 @@
+/******************************************************************************
+Engines-parallel.ino
+Application demonstrating all three engines at the same time.
+
+Byron Jacquot @ SparkFun Electronics
+October 21, 2016
+https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library
+
+
+Multiple execution engine example.
+
+loads three engines in patallel, and sets them all running.
+- Engine one fades first blue LED in and out.
+- Engine two blinks LED 2 between green and blue.
+- Engine three blinks LED 3 in a faster red.
+
+Multi-engine programs have a few particular details that need te be understood.
+
+After loading the program, the load/verify routines leave the execution engines
+in hold state.  Apparently necessary to allow PC/entry point setting, and to set them to
+running.
+
+Entry points have a funny side effect: the engine operates relative to the entry
+point, NOT the absolute program memory address.
+IE: the program counter for the engine is relative to the entry point.  In the program
+we're using here, engine 1 takes a start point of 4.  It will initialize, and report a
+PC of 0, which is actually the offset into memory from the entrry point.  If you
+observe the PC as it rungs, it will be in the range 0..7.
+
+The branch also
+branches to 0, which is relative ot the entry point, meaning instruction address 4.
+
+The sequence of operations is a rigid/fragile.  Getting things out of order means they
+probably won't work.
+In general:
+-load the program (optionally, verify),
+-set the relevant entry points and PCs,
+-set execution mode (usually free-running), 
+-then set them running.
+
+You'll also gind some commented-out chunkso fo code that would allow a demonstration
+of the "step" execution mode.  If you set engine 3 to step, then you can see that
+it's incremented exactly one instruction
+
+
+Resources:
+Written using SparkFun Pro Micro controller, with LP55231 breakout board.
+
+Development environment specifics:
+Written using Arduino 1.6.5
+
+This code is released under the [MIT License](http://opensource.org/licenses/MIT).
+
+Please review the LICENSE.md file included with this example. If you have any questions
+or concerns with licensing, please contact techsupport@sparkfun.com.
+
+Distributed as-is; no warranty is given.
+******************************************************************************/
+
 #include <lp55231.h>
 
 #include <Wire.h>
 
 static const int32_t enable_pin = 15; // active high
 
-// Multiple execution engine example.
-//
-// loads three engines in patallel, and sets them all running.
-// - Engine one fades first blue LED in and out.
-// - Engine two blinks LED 2 between green and blue.
-// - Engine three blinks LED 3 in a faster red.
-//
-// Multi-engine programs have a few particular details that need te be understood.
-//
-// After loading the program, the load/verify routines leave the execution engines
-// in hold state.  Apparently necessary to allow PC/entry point setting, and to set them to
-// running.
-//
-// Entry points have a funny side effect: the engine operates relative to the entry
-// point, NOT the absolute program memory address.
-// IE: the program counter for the engine is relative to the entry point.  In the program
-// we're using here, engine 1 takes a start point of 4.  It will initialize, and report a
-// PC of 0, which is actually the offset into memory from the entrry point.  If you
-// observe the PC as it rungs, it will be in the range 0..7.
-//
-// The branch also
-// branches to 0, which is relative ot the entry point, meaning instruction address 4.
-//
-// The sequence of operations is a rigid/fragile.  Getting things out of order means they
-// probably won't work.  In general: load the program (optionally, verify), set the relevant entry points and PCs,
-// set execution mode (usually free-running), then set them running.
-//
-// You'll also gind some commented-out chunkso fo code that would allow a demonstration
-// of the "step" execution mode.  If you set engine 3 to step, then you can see that
-// it's incremented exactly one instruction
-//
 
 
 

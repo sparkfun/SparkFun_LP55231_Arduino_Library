@@ -9,11 +9,9 @@ The simplest demo of LP55231 functionality.  Initializes the chip, then
 sequentially turn on each of the 9 channels.
 
 Resources:
-Written using SparkFun Pro Micro controller, with an LP55231 breakut board.
 
 Development environment specifics:
 Written using Arduino 1.6.5
-
 
 This code is released under the [MIT License](http://opensource.org/licenses/MIT).
 

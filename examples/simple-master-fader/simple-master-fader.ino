@@ -1,15 +1,20 @@
 /******************************************************************************
-simple-demo.ino
-simple demo of using LP55231 to control 9 LEDs.
+simple-master-fader.ino
+simple demo of using LP55231 master faders
 Byron Jacquot @ SparkFun Electronics
-October 12, 2016
+October 21, 2016
 https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library
 
-The simplest demo of LP55231 functionality.  Initializes the chip, then
-sequentially turn on each of the 9 channels.
+Demonstration of LP55231 master fader functionality.
+
+The first RGB LED is configured to a color mix of 100% red, 50% blue and 25% green, a
+pinkish-white tint.
+Those channels are assigned to the same master fader, and the fader output is incremented.
+The result is that the LED maintains the color balance as it fades, remaining pinkish-white
+at increasing intensities.
 
 Resources:
-Written using SparkFun Pro Micro controller, with an LP55231 breakut board.
+Written using SparkFun Pro Micro controller, with an LP55231 breakout board.
 
 Development environment specifics:
 Written using Arduino 1.6.5
@@ -50,9 +55,9 @@ void setup() {
   ledChip.SetDriveCurrent(1, 0xff);
   ledChip.SetDriveCurrent(6, 0xff);
 
-  ledChip.SetChannelPWM(0,0xff);
+  ledChip.SetChannelPWM(0,0x80);
   ledChip.SetChannelPWM(1,0x40);
-  ledChip.SetChannelPWM(6,0x80);
+  ledChip.SetChannelPWM(6,0xff);
 
   delay(500);
 
@@ -71,7 +76,7 @@ void loop() {
 
   if(millis() >= next)
   {
-    next += 100;
+    next += 50;
 
     Serial.print("Illuminating: ");
     Serial.println(current);
