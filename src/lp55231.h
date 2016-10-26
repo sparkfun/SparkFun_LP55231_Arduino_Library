@@ -43,6 +43,17 @@ public:
   static const uint8_t NumEngines = 3;
   static const uint8_t NumInstructions = 96;
 
+  enum lp_err_code
+  {
+    LP_ERR_NONE = 0,
+    LP_ERR_INVALID_CHANNEL,
+    LP_ERR_INVALID_FADER,
+    LP_ERR_INVALID_ENGINE,
+    LP_ERR_PROGRAM_LENGTH,
+    LP_ERR_PROGRAM_VALIDATION,
+    LP_ERR_PROGRAM_PC,
+    LP_ERR_GPIO_OFF
+  };
 
   // Initialization routines
   void Begin();
@@ -51,15 +62,15 @@ public:
   void Reset();
 
   // control outputs directly
-  bool SetChannelPWM(uint8_t channel, uint8_t value);
-  bool SetMasterFader(uint8_t fader, uint8_t value);
+  lp_err_code SetChannelPWM(uint8_t channel, uint8_t value);
+  lp_err_code SetMasterFader(uint8_t fader, uint8_t value);
 
   // More detailed channel configuration
-  bool SetLogBrightness(uint8_t channel, bool enable);
-  bool SetDriveCurrent(uint8_t channel, uint8_t value);
+  lp_err_code SetLogBrightness(uint8_t channel, bool enable);
+  lp_err_code SetDriveCurrent(uint8_t channel, uint8_t value);
 
   // Configure outputs
-  bool AssignChannelToMasterFader(uint8_t channel, uint8_t fader);
+  lp_err_code AssignChannelToMasterFader(uint8_t channel, uint8_t fader);
 
 
 protected:
@@ -79,25 +90,25 @@ public:
   Lp55231Engines(uint8_t address = 0x32): Lp55231(address)
   { };
 
-  bool SetRatiometricDimming(uint8_t channel, bool value);
+  lp_err_code SetRatiometricDimming(uint8_t channel, bool value);
 
   // Execution engine related items.
-  bool LoadProgram(const uint16_t* prog, uint8_t len);
-  bool VerifyProgram(const uint16_t* prog, uint8_t len);
-  bool SetEngineEntryPoint(uint8_t engine, uint8_t addr);
-  bool SetEnginePC(uint8_t engine, uint8_t addr);
+  lp_err_code LoadProgram(const uint16_t* prog, uint8_t len);
+  lp_err_code VerifyProgram(const uint16_t* prog, uint8_t len);
+  lp_err_code SetEngineEntryPoint(uint8_t engine, uint8_t addr);
+  lp_err_code SetEnginePC(uint8_t engine, uint8_t addr);
   uint8_t GetEnginePC(uint8_t engine);
   uint8_t GetEngineMap(uint8_t engine);
 
   // Set engine execution modes
-  bool SetEngineModeHold(uint8_t engine);
-  bool SetEngineModeStep(uint8_t engine);
-  bool SetEngineModeOnce(uint8_t engine);
-  bool SetEngineModeFree(uint8_t engine);
+  lp_err_code SetEngineModeHold(uint8_t engine);
+  lp_err_code SetEngineModeStep(uint8_t engine);
+  lp_err_code SetEngineModeOnce(uint8_t engine);
+  lp_err_code SetEngineModeFree(uint8_t engine);
   uint8_t GetEngineMode(uint8_t engine);
 
   // start an engine.
-  bool SetEngineRunning(uint8_t engine);
+  lp_err_code SetEngineRunning(uint8_t engine);
 
   // Interrupt related
   uint8_t ClearInterrupt();

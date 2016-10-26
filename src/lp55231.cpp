@@ -165,35 +165,36 @@ void Lp55231::Reset()
   WriteReg(REG_RESET, 0xff);
 }
 
-bool Lp55231::SetChannelPWM(uint8_t channel, uint8_t value)
+Lp55231::lp_err_code Lp55231::SetChannelPWM(uint8_t channel, uint8_t value)
 {
   if(channel >= NumChannels)
   {
-    Serial.println("setBrightness: invalid channel");
-    return false;
+    return LP_ERR_INVALID_CHANNEL;
   }
 
   WriteReg(REG_D1_PWM + channel, value);
-  return true;
+  return LP_ERR_NONE;
 }
 
-bool Lp55231::SetMasterFader(uint8_t fader, uint8_t value)
+Lp55231::lp_err_code Lp55231::SetMasterFader(uint8_t fader, uint8_t value)
 {
   if(fader >= NumFaders)
   {
-    return false;
+    return LP_ERR_INVALID_FADER;
   }
 
   WriteReg(REG_MASTER_FADE_1 + fader, value);
+
+  return LP_ERR_NONE;
 }
 
-bool Lp55231::SetLogBrightness(uint8_t channel, bool enable)
+Lp55231::lp_err_code Lp55231::SetLogBrightness(uint8_t channel, bool enable)
 {
   uint8_t regVal, bitVal;
 
   if(channel >= NumChannels)
   {
-    return false;
+    return LP_ERR_INVALID_CHANNEL;
   }
 
   regVal = ReadReg(REG_D1_CTRL + channel);
@@ -201,31 +202,33 @@ bool Lp55231::SetLogBrightness(uint8_t channel, bool enable)
   regVal &= ~0x20;
   regVal |= bitVal;
   WriteReg(REG_D1_CTRL + channel, regVal);
+
+  return LP_ERR_NONE;
 }
 
-bool Lp55231::SetDriveCurrent(uint8_t channel, uint8_t value)
+Lp55231::lp_err_code Lp55231::SetDriveCurrent(uint8_t channel, uint8_t value)
 {
   if(channel >= NumChannels)
   {
-    return false;
+    return LP_ERR_INVALID_CHANNEL;
   }
 
   WriteReg(REG_D1_I_CTL + channel, value);
-  return true;
+  return LP_ERR_NONE;
 }
 
 
-bool Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_t fader)
+Lp55231::lp_err_code Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_t fader)
 {
   uint8_t regVal, bitVal;
 
   if(channel >= NumChannels)
   {
-    return false;
+    return LP_ERR_INVALID_CHANNEL;
   }
   else if(fader >= NumFaders)
   {
-    return false;
+    return LP_ERR_INVALID_FADER;
   }
 
   regVal = ReadReg(REG_D1_CTRL + channel);
@@ -235,6 +238,7 @@ bool Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_t fader)
   regVal |= bitVal;
   WriteReg(REG_D1_CTRL + channel, regVal);
 
+  return LP_ERR_NONE;
 }
 
 /********************************************************************************/
@@ -243,14 +247,13 @@ bool Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_t fader)
 
 // Ratiometric dimming is similar to master fader, but when LEDs are driven by
 // Execution engines.
-bool Lp55231Engines::SetRatiometricDimming(uint8_t channel, bool value)
+Lp55231::lp_err_code Lp55231Engines::SetRatiometricDimming(uint8_t channel, bool value)
 {
   uint8_t regVal;
 
   if(channel >= NumChannels)
   {
-    Serial.println("setLogBrightness: invalid channel");
-    return false;
+    return LP_ERR_INVALID_CHANNEL;
   }
 
   if(channel == NumChannels - 1)
@@ -280,18 +283,17 @@ bool Lp55231Engines::SetRatiometricDimming(uint8_t channel, bool value)
     WriteReg(REG_RATIO_LSB, regVal);
   }
 
-  return true;
+  return LP_ERR_NONE;
 }
 
-bool Lp55231Engines::LoadProgram(const uint16_t* prog, uint8_t len)
+Lp55231::lp_err_code Lp55231Engines::LoadProgram(const uint16_t* prog, uint8_t len)
 {
   uint8_t val;
   uint8_t page;
 
   if(len >= NumInstructions)
   {
-    Serial.println("program too long");
-    return false;
+    return LP_ERR_PROGRAM_LENGTH;
   }
 
   // set up program write
@@ -342,19 +344,16 @@ bool Lp55231Engines::LoadProgram(const uint16_t* prog, uint8_t len)
 
   WriteReg(REG_CNTRL2, 0x00);
 
-  return true;
+  return LP_ERR_NONE;
 }
 
-bool Lp55231Engines::VerifyProgram(const uint16_t* prog, uint8_t len)
+Lp55231::lp_err_code Lp55231Engines::VerifyProgram(const uint16_t* prog, uint8_t len)
 {
   uint8_t val, page;
 
   if(len >= NumInstructions)
   {
-    // TBD - support multiple pages
-
-    Serial.println("Verify program too long");
-    return false;
+    return LP_ERR_PROGRAM_LENGTH;
   }
 
   WriteReg(REG_CNTRL2, 0x00);// engines into disable mode - required for entry to program mode.
@@ -382,14 +381,14 @@ bool Lp55231Engines::VerifyProgram(const uint16_t* prog, uint8_t len)
 
       if(lsb != prog[i + (page*16)])
       {
-        Serial.print("program mismatch.  Idx:");
-        Serial.print(i);
-        Serial.print(" local:");
-        Serial.print(prog[i + (page*16)], HEX);
-        Serial.print(" remote:");
-        Serial.println(lsb, HEX);
+        // Serial.print("program mismatch.  Idx:");
+        // Serial.print(i);
+        // Serial.print(" local:");
+        // Serial.print(prog[i + (page*16)], HEX);
+        // Serial.print(" remote:");
+        // Serial.println(lsb, HEX);
 
-        return false;
+        return LP_ERR_PROGRAM_VALIDATION;
       }
     }
   }
@@ -401,8 +400,8 @@ bool Lp55231Engines::VerifyProgram(const uint16_t* prog, uint8_t len)
   {
     uint16_t msb, lsb;
     uint8_t addr = (REG_PROG_MEM_BASE + (i*2));
-    Serial.print("Verifying: ");
-    Serial.println(addr, HEX);
+    // Serial.print("Verifying: ");
+    // Serial.println(addr, HEX);
 
     msb = ReadReg(addr);
     lsb = ReadReg(addr + 1);
@@ -411,51 +410,48 @@ bool Lp55231Engines::VerifyProgram(const uint16_t* prog, uint8_t len)
 
     if(lsb != prog[i + (page*16)])
     {
-      Serial.print("program mismatch.  Idx:");
-      Serial.print(i);
-      Serial.print(" local:");
-      Serial.print(prog[i + (page*16)], HEX);
-      Serial.print(" remote:");
-      Serial.println(lsb, HEX);
-
-      return false;
+      // Serial.print("program mismatch.  Idx:");
+      // Serial.print(i);
+      // Serial.print(" local:");
+      // Serial.print(prog[i + (page*16)], HEX);
+      // Serial.print(" remote:");
+      // Serial.println(lsb, HEX);
+      //
+      return LP_ERR_PROGRAM_VALIDATION;
     }
   }
 
   WriteReg(REG_CNTRL2, 0x00);
 
-  return true;
+  return LP_ERR_NONE;
 }
 
-bool Lp55231Engines::SetEngineEntryPoint(uint8_t engine, uint8_t addr)
+Lp55231::lp_err_code Lp55231Engines::SetEngineEntryPoint(uint8_t engine, uint8_t addr)
 {
 
   if(engine >= NumEngines)
   {
-    Serial.println("Invalid engine num in set EP");
-    return false;
+    return LP_ERR_INVALID_ENGINE;
   }
 
   WriteReg(REG_PROG1_START + engine, addr);
 
-  return true;
+  return LP_ERR_NONE;
 }
 
-bool Lp55231Engines::SetEnginePC(uint8_t engine, uint8_t addr)
+Lp55231::lp_err_code Lp55231Engines::SetEnginePC(uint8_t engine, uint8_t addr)
 {
   uint8_t control_val, control2_val, temp;;
 
   if(engine >= NumEngines)
   {
-    Serial.println("Invalid engine num in set PC");
-    return false;
+    return LP_ERR_INVALID_ENGINE;
   }
 
   // There are 6 pages of 16 instructions each (0..95)
   if(addr >= NumInstructions)
   {
-    Serial.println("Invalid addr in set PC");
-    return false;
+    return LP_ERR_PROGRAM_PC;
   }
 
   // In Ctl1 descriptions:
@@ -476,7 +472,7 @@ bool Lp55231Engines::SetEnginePC(uint8_t engine, uint8_t addr)
   WriteReg(REG_CNTRL1, control_val);
   WriteReg(REG_CNTRL2, control2_val);
 
-  return true;
+  return LP_ERR_NONE;
 }
 
 uint8_t Lp55231Engines::GetEnginePC(uint8_t engine)
@@ -486,7 +482,6 @@ uint8_t Lp55231Engines::GetEnginePC(uint8_t engine)
 
   if(engine >= NumEngines)
   {
-    Serial.println("Invalid engine num in set PC");
     return -1;
   }
 
@@ -502,8 +497,7 @@ uint8_t Lp55231Engines::GetEngineMode(uint8_t engine)
 
   if(engine >= NumEngines)
   {
-    Serial.println("Get engine mode got invalid engine #");
-    return false;
+    return 0xff;
   }
 
   val = ReadReg(REG_CNTRL1);
@@ -518,21 +512,19 @@ uint8_t Lp55231Engines::GetEngineMap(uint8_t engine)
 {
   if(engine >= NumEngines)
   {
-    Serial.println("Invalid engine num in get map");
-    return -1;
+    return 0xFF;
   }
 
   return(ReadReg(REG_ENG1_MAP_LSB + engine));
 }
 
-bool Lp55231Engines::SetEngineModeHold(uint8_t engine)
+Lp55231::lp_err_code Lp55231Engines::SetEngineModeHold(uint8_t engine)
 {
   uint8_t val;
 
   if(engine >= NumEngines)
   {
-    Serial.println("Set free got invalid engine #");
-    return false;
+    return LP_ERR_INVALID_ENGINE;
   }
 
   // Set the enghine to "free running" execution type
@@ -542,17 +534,16 @@ bool Lp55231Engines::SetEngineModeHold(uint8_t engine)
   //val |= (0x10 >> (engine * 2));
   WriteReg(REG_CNTRL1, val );
 
-  return(true);
+  return LP_ERR_NONE;
 }
 
-bool Lp55231Engines::SetEngineModeStep(uint8_t engine)
+Lp55231::lp_err_code Lp55231Engines::SetEngineModeStep(uint8_t engine)
 {
   uint8_t val;
 
   if(engine >= NumEngines)
   {
-    Serial.println("Set free got invalid engine #");
-    return false;
+    return LP_ERR_INVALID_ENGINE;
   }
 
   // Set the enghine to "single step" execution type
@@ -562,10 +553,10 @@ bool Lp55231Engines::SetEngineModeStep(uint8_t engine)
   val |= (0x10 >> (engine * 2));
   WriteReg(REG_CNTRL1, val );
 
-  return(true);
+  return LP_ERR_NONE;
 }
 
-bool Lp55231Engines::SetEngineModeOnce(uint8_t engine)
+Lp55231::lp_err_code Lp55231Engines::SetEngineModeOnce(uint8_t engine)
 {
   uint8_t val;
 
@@ -576,8 +567,7 @@ bool Lp55231Engines::SetEngineModeOnce(uint8_t engine)
 
   if(engine >= NumEngines)
   {
-    Serial.println("Set one shot got invalid engine #");
-    return false;
+    return LP_ERR_INVALID_ENGINE;
   }
 
   // Set the enghine to "one shot" execution type
@@ -585,23 +575,19 @@ bool Lp55231Engines::SetEngineModeOnce(uint8_t engine)
   val = ReadReg(REG_CNTRL1);
   val |= (0x30 >> (engine * 2));
 
-  Serial.print("C1: ");
-  Serial.println(val, HEX);
-
   WriteReg(REG_CNTRL1, val );
 
-  return(true);
+  return LP_ERR_NONE;
 
 }
 
-bool Lp55231Engines::SetEngineModeFree(uint8_t engine)
+Lp55231::lp_err_code Lp55231Engines::SetEngineModeFree(uint8_t engine)
 {
   uint8_t val;
 
   if(engine >= NumEngines)
   {
-    Serial.println("Set free got invalid engine #");
-    return false;
+    return LP_ERR_INVALID_ENGINE;
   }
 
   // Set the enghine to "free running" execution type
@@ -609,24 +595,18 @@ bool Lp55231Engines::SetEngineModeFree(uint8_t engine)
   val &= ~(0x30 >> (engine * 2));
   val |= (0x20 >> (engine * 2));
 
-  // Serial.print("Free: ");
-  // Serial.print(engine, HEX);
-  // Serial.print(" ");
-  // Serial.println(val, HEX);
-
   WriteReg(REG_CNTRL1, val );
 
-  return(true);
+  return LP_ERR_NONE;
 }
 
-bool Lp55231Engines::SetEngineRunning(uint8_t engine)
+Lp55231::lp_err_code Lp55231Engines::SetEngineRunning(uint8_t engine)
 {
   uint8_t val;
 
   if(engine >= NumEngines)
   {
-    Serial.println("Set running got invalid engine #");
-    return false;
+    return LP_ERR_INVALID_ENGINE;
   }
 
   // This assumes that a suitable run mode in CNTRL1 was already selected.
@@ -636,7 +616,7 @@ bool Lp55231Engines::SetEngineRunning(uint8_t engine)
   val |= (0x20>> (engine * 2));
   WriteReg(REG_CNTRL2, val);
 
-  return true;
+  return LP_ERR_NONE;
 }
 
 
@@ -674,7 +654,7 @@ bool Lp55231Engines::SetIntGPOVal(bool value)
 
   if (!(regVal & 0x04))
   {
-    return false;
+    return LP_ERR_GPIO_OFF;
   }
 
   if(value)
@@ -687,6 +667,8 @@ bool Lp55231Engines::SetIntGPOVal(bool value)
   }
 
   WriteReg(REG_INT_GPIO, regVal);
+
+  return LP_ERR_NONE;
 }
 
 
@@ -704,7 +686,6 @@ int8_t Lp55231Engines::ReadDegC()
   do
   {
     status = ReadReg(REG_TEMP_CTL);
-    //Serial.print(".");
   }while(status & 0x80);
 
   temperature = (int8_t)ReadReg(REG_TEMP_READ);
