@@ -14,7 +14,9 @@ chip appears to be a step behind the other.
 Resources:
 Written using SparkFun Pro Micro controller, with two LP55231 breakout boards.
 
-The second Lp55231 board is configured for address 0x33, and the first board has
+Hardware Configuration:
+The second Lp55231 board is configured for address 0x33, by changing
+ Address Jumper A0.  The first board has
 the I2C pullup resistors disconnected.
 
 Development environment specifics:

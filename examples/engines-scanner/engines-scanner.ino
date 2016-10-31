@@ -45,9 +45,9 @@ static const uint16_t program[] =
 {
   0x9c10, // 0 map start
   0x9c9f, // 1 map end
-  0x02ff, // 2 ramp up
-  0x0800, // 3 wait
-  0x03ff, // 4 ramp down
+  0x06ff, // 2 ramp up
+  0x0200, // 3 wait
+  0x07ff, // 4 ramp down
   0x9d80, // 5 map next
   0xa002, // 6 loop to 2
   0x000a, // 7 - empty placeholder
@@ -101,7 +101,7 @@ void setup()
   for(uint8_t i = 0; i < 9; i++)
   {
     ledChip.SetLogBrightness(i, true);
-    ledChip.SetDriveCurrent(i, 111);
+    ledChip.SetDriveCurrent(i, 0xff);
   }
 
   if(ledChip.LoadProgram(program, (sizeof(program)/2)))
