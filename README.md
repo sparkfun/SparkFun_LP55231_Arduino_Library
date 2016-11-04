@@ -27,7 +27,7 @@ Product Versions
 
 Version History
 ---------------
-* [Initial Release of library](434dd990f3ec99a9c6650d770262cef6aaa55b1e) - Initial release, containging both Lp55231 and Lp55231Engines classes.
+* [434dd990f3ec99a9c6650d770262cef6aaa55b1e](https://github.com/sparkfun/SparkFun_LP55231_Arduino_Library/commit/434dd990f3ec99a9c6650d770262cef6aaa55b1e) - Initial release, containging both Lp55231 and Lp55231Engines classes.
 
 License Information
 -------------------
