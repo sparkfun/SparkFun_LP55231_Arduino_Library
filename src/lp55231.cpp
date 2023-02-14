@@ -241,6 +241,23 @@ Lp55231::lp_err_code Lp55231::AssignChannelToMasterFader(uint8_t channel, uint8_
   return LP_ERR_NONE;
 }
 
+Lp55231::lp_err_code Lp55231::SetChargePumpMode(uint8_t mode)
+{
+  uint8_t regVal;
+
+  if(mode&0b11100111 > 0)
+  {
+    return LP_ERR_INVALID_MODE;
+  }
+
+  regVal = ReadReg(REG_MISC);
+  regVal &= 0b11100111;
+  regVal |= mode;
+  WriteReg(REG_MISC, regVal);
+
+  return LP_ERR_NONE;
+}
+
 /********************************************************************************/
 /**  Engine related derived class functions. **/
 /********************************************************************************/
