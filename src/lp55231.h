@@ -30,6 +30,11 @@ Distributed as-is; no warranty is given.
 #ifndef _LP55231_H_
 #define _LP55231_H_
 
+#define CP_OFF 0b00000000
+#define CP_BYPASS 0b00001000
+#define CP_4V5 0b00010000
+#define CP_AUTO 0b00011000
+
 #include <stdint.h>
 
 class Lp55231
@@ -52,7 +57,8 @@ public:
     LP_ERR_PROGRAM_LENGTH,
     LP_ERR_PROGRAM_VALIDATION,
     LP_ERR_PROGRAM_PC,
-    LP_ERR_GPIO_OFF
+    LP_ERR_GPIO_OFF,
+    LP_ERR_INVALID_MODE
   };
 
   // Initialization routines
@@ -71,6 +77,9 @@ public:
 
   // Configure outputs
   lp_err_code AssignChannelToMasterFader(uint8_t channel, uint8_t fader);
+
+  // Configure charge pump
+  lp_err_code SetChargePumpMode(uint8_t mode);
 
 
 protected:
